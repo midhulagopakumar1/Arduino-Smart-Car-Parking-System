@@ -1,0 +1,88 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+LiquidCrystal_I2C lcd(0x27, 20, 4); // Use 0x3F if 0x27 shows blank boxes
+Servo gateServo;
+
+// Pin mapping based on your custom connections
+// Note: Slot 6 was missing from your list, so I assigned it to Pin 5.
+const int slotPins[5] = {4, 3, 2, 1, 7}; 
+const int entrySensor = 5;
+const int exitSensor = 6;
+const int servoPin = 10;
+
+int availableSlots = 5;
+
+void setup() {
+  lcd.init();
+  lcd.backlight();
+  
+  gateServo.attach(servoPin);
+  gateServo.write(90); // Initial closed position
+
+  for(int i = 0; i < 5; i++) {
+    pinMode(slotPins[i], INPUT);
+  }
+  pinMode(entrySensor, INPUT);
+  pinMode(exitSensor, INPUT);
+}
+
+void loop() {
+  availableSlots = 0;
+
+  // Tally empty slots (HIGH = Empty, LOW = Car Detected)
+  for(int i = 0; i < 5; i++) {
+    if(digitalRead(slotPins[i]) == HIGH) { 
+      availableSlots++; 
+    }
+  }
+
+  displaySlotStatus();
+
+  // Entry Gate: Open if car is waiting AND parking is not full
+  if(digitalRead(entrySensor) == LOW && availableSlots > 0) {
+    operateGate();
+  }
+
+  // Exit Gate: Always open for departing cars
+  if(digitalRead(exitSensor) == LOW) {
+    operateGate();
+  }
+  
+  delay(200); 
+}
+
+void displaySlotStatus() {
+  lcd.setCursor(0, 0);
+  lcd.print("SMART PARKING SYSTEM");
+
+  // Format first row of slots
+  lcd.setCursor(0, 1);
+  lcd.print("S1:"); lcd.print(digitalRead(slotPins[0]) == LOW ? "[X]" : "[ ]");
+  lcd.print(" S2:"); lcd.print(digitalRead(slotPins[1]) == LOW ? "[X]" : "[ ]");
+  lcd.print(" S3:"); lcd.print(digitalRead(slotPins[2]) == LOW ? "[X]" : "[ ]");
+
+  // Format second row of slots
+  lcd.setCursor(0, 2);
+  lcd.print("S4:"); lcd.print(digitalRead(slotPins[3]) == LOW ? "[X]" : "[ ]");
+  lcd.print(" S5:"); lcd.print(digitalRead(slotPins[4]) == LOW ? "[X]" : "[ ]");
+
+  // Overall status
+  lcd.setCursor(0, 3);
+  lcd.print("Free Spaces: ");
+  lcd.print(availableSlots);
+  
+  if(availableSlots == 0) {
+    lcd.print(" FULL");
+  } else {
+    lcd.print("     ");
+  }
+}
+
+void operateGate() {
+  gateServo.write(0);  // Open gate
+  delay(3000);         // Hold for 3 seconds
+  gateServo.write(90); // Close gate
+  delay(1000);         // 1 second cooldown
+}
